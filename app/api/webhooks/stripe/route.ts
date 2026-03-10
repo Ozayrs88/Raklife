@@ -68,7 +68,18 @@ export async function POST(request: NextRequest) {
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   console.log('💳 Processing checkout completion:', session.id);
   
-  const supabase = await createClient();
+  // Use service role to bypass RLS
+  const { createClient } = await import('@supabase/supabase-js');
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    }
+  );
   
   // Get customer and business IDs from metadata
   const customerId = session.metadata?.customer_id;
@@ -117,7 +128,18 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
   console.log('💰 Payment succeeded:', paymentIntent.id);
   
-  const supabase = await createClient();
+  // Use service role to bypass RLS
+  const { createClient } = await import('@supabase/supabase-js');
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    }
+  );
   
   // Get customer and business IDs from metadata
   const customerId = paymentIntent.metadata?.customer_id;
