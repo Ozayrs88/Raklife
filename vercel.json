@@ -1,0 +1,6 @@
+{
+  "crons": [{
+    "path": "/api/payment-recovery/auto-chase",
+    "schedule": "0 9 * * *"
+  }]
+}
