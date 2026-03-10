@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import DashboardLayout from '@/components/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Upload, Download, AlertCircle, CheckCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -78,7 +79,8 @@ ali@example.com,Ali Mohammed,+971503456789,Layla,7,1260.00,2024-10-30`;
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
+    <DashboardLayout>
+      <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold">Import Members</h1>
@@ -222,6 +224,7 @@ ali@example.com,Ali Mohammed,+971503456789,Layla,7,1260.00,2024-10-30`;
           Back to Members
         </Button>
       </div>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import DashboardLayout from '@/components/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Upload, Send, Search, Filter } from 'lucide-react';
@@ -43,21 +44,23 @@ export default function MembersContent({ businessId }: Props) {
 
   async function fetchMembers() {
     try {
-      // Get all customers who have bookings with this business
+      // SIMPLIFIED: Get all customers with overdue amounts for this business
+      // We'll filter by business through bookings OR just show all overdue customers
+      
+      // Option 1: Try to get via bookings first
       const { data: bookings } = await supabase
         .from('bookings')
         .select('customer_id')
         .eq('business_id', businessId);
 
-      if (!bookings || bookings.length === 0) {
-        setLoading(false);
-        return;
+      let customerIds: string[] = [];
+      
+      if (bookings && bookings.length > 0) {
+        customerIds = [...new Set(bookings.map(b => b.customer_id))];
       }
 
-      const customerIds = [...new Set(bookings.map(b => b.customer_id))];
-
-      // Get customer details with payment info
-      const { data: customers } = await supabase
+      // Option 2: If no bookings, just get all customers with overdue amounts
+      let query = supabase
         .from('users')
         .select(`
           id,
@@ -69,9 +72,16 @@ export default function MembersContent({ businessId }: Props) {
           last_payment_date,
           stripe_customer_id
         `)
-        .in('id', customerIds);
+        .eq('user_type', 'customer');
 
-      if (!customers) {
+      // If we have customer IDs from bookings, filter by those
+      if (customerIds.length > 0) {
+        query = query.in('id', customerIds);
+      }
+
+      const { data: customers } = await query;
+
+      if (!customers || customers.length === 0) {
         setLoading(false);
         return;
       }
@@ -145,6 +155,7 @@ export default function MembersContent({ businessId }: Props) {
     }
 
     try {
+      console.log('📤 Sending payment links for:', Array.from(selectedMembers));
       const response = await fetch('/api/payment-links/bulk-create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -154,16 +165,19 @@ export default function MembersContent({ businessId }: Props) {
         }),
       });
 
+      const result = await response.json();
+      console.log('📥 Response:', result);
+
       if (response.ok) {
-        alert('Payment links sent successfully!');
+        alert(`✅ Payment links sent!\n\nSuccessful: ${result.successful}\nFailed: ${result.failed}`);
         setSelectedMembers(new Set());
         fetchMembers();
       } else {
-        alert('Failed to send payment links');
+        alert(`❌ Failed to send payment links:\n${result.error || 'Unknown error'}`);
       }
-    } catch (error) {
-      console.error('Error sending payment links:', error);
-      alert('Error sending payment links');
+    } catch (error: any) {
+      console.error('❌ Error sending payment links:', error);
+      alert(`❌ Error: ${error.message}`);
     }
   }
 
@@ -172,14 +186,17 @@ export default function MembersContent({ businessId }: Props) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-lg">Loading members...</div>
-      </div>
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-lg">Loading members...</div>
+        </div>
+      </DashboardLayout>
     );
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <DashboardLayout>
+      <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -365,6 +382,7 @@ export default function MembersContent({ businessId }: Props) {
           </tbody>
         </table>
       </div>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }

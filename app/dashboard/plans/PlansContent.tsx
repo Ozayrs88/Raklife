@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import DashboardLayout from '@/components/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Plus, Edit, Trash2 } from 'lucide-react';
@@ -140,11 +141,16 @@ export default function PlansContent({ businessId }: Props) {
   }
 
   if (loading) {
-    return <div className="p-6">Loading...</div>;
+    return (
+      <DashboardLayout>
+        <div>Loading...</div>
+      </DashboardLayout>
+    );
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <DashboardLayout>
+      <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -294,6 +300,7 @@ export default function PlansContent({ businessId }: Props) {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }

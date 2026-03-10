@@ -1,10 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2024-11-20.acacia',
-});
+import twilio from 'twilio';
 
 export async function POST(request: NextRequest) {
   try {
@@ -37,16 +34,21 @@ export async function POST(request: NextRequest) {
     // Get business Stripe account
     const { data: business } = await supabase
       .from('businesses')
-      .select('stripe_account_id, stripe_charges_enabled, name')
+      .select('stripe_account_id, stripe_secret_key, name')
       .eq('id', business_id)
       .single();
 
-    if (!business || !business.stripe_account_id || !business.stripe_charges_enabled) {
+    if (!business || !business.stripe_secret_key) {
       return NextResponse.json(
-        { error: 'Please connect Stripe account first in Settings' },
+        { error: 'Please add your Stripe API keys in Settings first' },
         { status: 400 }
       );
     }
+
+    // Initialize Stripe with business's secret key
+    const stripe = new Stripe(business.stripe_secret_key, {
+      apiVersion: '2024-11-20.acacia',
+    });
 
     const results = {
       successful: 0,
@@ -85,8 +87,6 @@ export async function POST(request: NextRequest) {
               supabase_user_id: customer.id,
               business_id: business_id,
             },
-          }, {
-            stripeAccount: business.stripe_account_id,
           });
 
           stripeCustomerId = stripeCustomer.id;
@@ -98,8 +98,10 @@ export async function POST(request: NextRequest) {
             .eq('id', customer.id);
         }
 
-        // Create Stripe Payment Link
-        const paymentLink = await stripe.paymentLinks.create({
+        // Create Stripe Checkout Session (instead of Payment Link for better webhook support)
+        const checkoutSession = await stripe.checkout.sessions.create({
+          mode: 'payment',
+          customer: stripeCustomerId,
           line_items: [{
             price_data: {
               currency: 'aed',
@@ -111,21 +113,23 @@ export async function POST(request: NextRequest) {
             },
             quantity: 1,
           }],
-          after_completion: {
-            type: 'hosted_confirmation',
-            hosted_confirmation: {
-              custom_message: 'Thank you for your payment! Your account has been updated.',
-            },
-          },
-          customer_creation: 'if_required',
+          success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'}/payment-cancelled`,
           metadata: {
             customer_id: customer.id,
             business_id: business_id,
             purpose: 'overdue_recovery',
           },
-        }, {
-          stripeAccount: business.stripe_account_id,
+          payment_intent_data: {
+            metadata: {
+              customer_id: customer.id,
+              business_id: business_id,
+              purpose: 'overdue_recovery',
+            },
+          },
         });
+
+        const paymentUrl = checkoutSession.url;
 
         // Save payment link to database
         const { data: paymentLinkRecord } = await supabase
@@ -133,23 +137,65 @@ export async function POST(request: NextRequest) {
           .insert({
             business_id: business_id,
             customer_id: customer.id,
-            stripe_payment_link_id: paymentLink.id,
-            stripe_payment_link_url: paymentLink.url,
+            stripe_payment_link_id: checkoutSession.id,
+            stripe_payment_link_url: paymentUrl || '',
             amount: customer.overdue_amount,
             currency: 'AED',
             purpose: 'overdue_payment',
             description: `Outstanding balance: AED ${customer.overdue_amount}`,
             status: 'sent',
             sent_at: new Date().toISOString(),
-            sent_via: 'email',
+            sent_via: 'whatsapp',
             expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days
           })
           .select()
           .single();
 
-        // TODO: Send email/SMS with payment link
-        // For now, we'll just log it
-        console.log(`Payment link created for ${customer.email}: ${paymentLink.url}`);
+        // Send WhatsApp notification with payment link
+        if (customer.phone) {
+          try {
+            console.log(`📱 Attempting WhatsApp to ${customer.phone}...`);
+            
+            const twilioClient = twilio(
+              process.env.TWILIO_ACCOUNT_SID,
+              process.env.TWILIO_AUTH_TOKEN
+            );
+            
+            // Calculate days overdue
+            const daysOverdue = 7;
+            
+            // Build WhatsApp message
+            const message = `⚠️ PAYMENT REMINDER
+
+Hi ${customer.full_name?.split(' ')[0] || 'there'},
+
+Your account with ${business.name} is ${daysOverdue} days overdue.
+
+Amount due: *AED ${customer.overdue_amount}*
+
+Please pay now to avoid service interruption:
+${paymentUrl}
+
+Questions? Contact us.
+
+Thank you!
+${business.name}`;
+            
+            // Send WhatsApp via Twilio
+            const whatsappResult = await twilioClient.messages.create({
+              from: process.env.TWILIO_WHATSAPP_NUMBER || 'whatsapp:+14155238886',
+              to: `whatsapp:${customer.phone}`,
+              body: message,
+            });
+            
+            console.log(`✅ WhatsApp sent to ${customer.phone}! SID: ${whatsappResult.sid}`);
+          } catch (whatsappError: any) {
+            console.error(`❌ Failed to send WhatsApp to ${customer.phone}:`, whatsappError.message);
+            // Don't fail the whole process if WhatsApp fails
+          }
+        } else {
+          console.log(`⚠️ No phone number for ${customer.full_name}, skipping WhatsApp`);
+        }
 
         results.successful++;
       } catch (error: any) {

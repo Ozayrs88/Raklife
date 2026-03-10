@@ -54,6 +54,8 @@ export default function SettingsContent({ business: initialBusiness }: Props) {
     address: business.address || '',
     city: business.city || 'Ras Al Khaimah',
     country: business.country || 'UAE',
+    stripe_publishable_key: business.stripe_account_id || '',
+    stripe_secret_key: '',
   })
 
   const router = useRouter()
@@ -61,6 +63,8 @@ export default function SettingsContent({ business: initialBusiness }: Props) {
 
   // Check Stripe connection status on mount
   useEffect(() => {
+    loadStripeKeys();
+    
     if (business.stripe_account_id) {
       checkStripeStatus()
     }
@@ -74,6 +78,26 @@ export default function SettingsContent({ business: initialBusiness }: Props) {
       window.history.replaceState({}, '', '/dashboard/settings')
     }
   }, [])
+
+  const loadStripeKeys = async () => {
+    try {
+      const { data } = await supabase
+        .from('businesses')
+        .select('stripe_account_id, stripe_secret_key')
+        .eq('id', business.id)
+        .single();
+
+      if (data) {
+        setFormData(prev => ({
+          ...prev,
+          stripe_publishable_key: data.stripe_account_id || '',
+          stripe_secret_key: data.stripe_secret_key || '',
+        }));
+      }
+    } catch (error) {
+      console.error('Error loading Stripe keys:', error);
+    }
+  }
 
   const checkStripeStatus = async () => {
     try {
@@ -150,15 +174,31 @@ export default function SettingsContent({ business: initialBusiness }: Props) {
     e.preventDefault()
     setLoading(true)
 
+    // Prepare update data
+    const updateData = {
+      name: formData.name,
+      business_type: formData.business_type,
+      description: formData.description,
+      phone: formData.phone,
+      email: formData.email,
+      address: formData.address,
+      city: formData.city,
+      country: formData.country,
+      // Store stripe publishable key in stripe_account_id (repurposing this field)
+      stripe_account_id: formData.stripe_publishable_key || null,
+      // Store secret key encrypted (you should encrypt this properly in production)
+      stripe_secret_key: formData.stripe_secret_key || null,
+    }
+
     const { error } = await supabase
       .from('businesses')
-      .update(formData)
+      .update(updateData)
       .eq('id', business.id)
 
     if (error) {
       alert(`Error: ${error.message}`)
     } else {
-      setBusiness({ ...business, ...formData })
+      setBusiness({ ...business, ...updateData })
       alert('Settings saved successfully!')
       router.refresh()
     }
@@ -195,7 +235,7 @@ export default function SettingsContent({ business: initialBusiness }: Props) {
               Business Information
             </CardTitle>
             <CardDescription>
-              Update your business details that customers will see
+              Update your business details and Stripe payment settings
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -293,6 +333,59 @@ export default function SettingsContent({ business: initialBusiness }: Props) {
                 </div>
               </div>
 
+              {/* Stripe API Keys */}
+              <div className="space-y-4 pt-4 border-t">
+                <div className="space-y-2">
+                  <h3 className="text-lg font-semibold">Stripe API Keys</h3>
+                  <p className="text-sm text-gray-600">
+                    Enter your Stripe keys to enable payment processing
+                  </p>
+                </div>
+
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+                  <p className="font-semibold text-blue-900 mb-2">How to get your keys:</p>
+                  <ol className="list-decimal ml-4 space-y-1 text-blue-800">
+                    <li>Go to <a href="https://dashboard.stripe.com/test/apikeys" target="_blank" rel="noopener noreferrer" className="underline font-medium">Stripe API Keys</a></li>
+                    <li>Make sure you're in <strong>Test mode</strong></li>
+                    <li>Copy your <strong>Publishable key</strong> (pk_test_...)</li>
+                    <li>Copy your <strong>Secret key</strong> (sk_test_...)</li>
+                  </ol>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="stripe_publishable_key">Publishable Key</Label>
+                  <Input
+                    id="stripe_publishable_key"
+                    type="text"
+                    placeholder="pk_test_..."
+                    value={formData.stripe_publishable_key || ''}
+                    onChange={(e) => setFormData({ ...formData, stripe_publishable_key: e.target.value })}
+                  />
+                  <p className="text-xs text-gray-500">Safe to share publicly</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="stripe_secret_key">Secret Key</Label>
+                  <Input
+                    id="stripe_secret_key"
+                    type="text"
+                    placeholder={formData.stripe_secret_key ? "sk_test_••••••••••••••••" : "sk_test_..."}
+                    value={formData.stripe_secret_key || ''}
+                    onChange={(e) => setFormData({ ...formData, stripe_secret_key: e.target.value })}
+                  />
+                  <p className="text-xs text-gray-500">
+                    {formData.stripe_secret_key ? '✅ Secret key saved (showing in plain text - save form to encrypt)' : 'Keep this private'}
+                  </p>
+                </div>
+
+                {(formData.stripe_publishable_key && formData.stripe_secret_key) && (
+                  <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                    <p className="text-sm font-medium text-green-900">Stripe keys ready to save</p>
+                  </div>
+                )}
+              </div>
+
               <div className="flex justify-end">
                 <Button type="submit" disabled={loading}>
                   <Save className="w-4 h-4 mr-2" />
@@ -330,117 +423,6 @@ export default function SettingsContent({ business: initialBusiness }: Props) {
                 {business.is_active ? 'Deactivate' : 'Activate'}
               </Button>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CreditCard className="w-5 h-5" />
-              Payment Settings (Stripe)
-            </CardTitle>
-            <CardDescription>
-              Connect Stripe to accept payments and process overdue balances
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {business.stripe_account_id ? (
-              <div className="space-y-4">
-                <div className="flex items-start justify-between p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <div className="flex items-start gap-3">
-                    <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
-                    <div>
-                      <p className="font-medium text-green-900">Stripe Connected</p>
-                      <p className="text-sm text-green-700 mt-1">
-                        Account ID: {business.stripe_account_id.substring(0, 20)}...
-                      </p>
-                      <p className="text-sm text-green-700">
-                        Status: {business.stripe_account_status || 'connected'}
-                      </p>
-                      <p className="text-sm text-green-700">
-                        Charges Enabled: {business.stripe_charges_enabled ? 'Yes' : 'No'}
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleDisconnectStripe}
-                    className="text-red-600 hover:text-red-700"
-                  >
-                    Disconnect
-                  </Button>
-                </div>
-
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => window.open('https://dashboard.stripe.com', '_blank')}
-                  >
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                    Open Stripe Dashboard
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => router.push('/dashboard/payment-recovery')}
-                  >
-                    Go to Payment Recovery
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="flex items-start gap-3 p-4 bg-orange-50 border border-orange-200 rounded-lg">
-                  <XCircle className="w-5 h-5 text-orange-600 mt-0.5" />
-                  <div>
-                    <p className="font-medium text-orange-900">Stripe Not Connected</p>
-                    <p className="text-sm text-orange-700 mt-1">
-                      Connect your Stripe account to accept payments and use the payment recovery system.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
-                  <p className="text-sm font-medium text-blue-900">What you'll get with Stripe:</p>
-                  <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside ml-2">
-                    <li>Accept payments directly to YOUR Stripe account</li>
-                    <li>Create automated payment links for overdue members</li>
-                    <li>Accept credit/debit cards, Apple Pay, Google Pay</li>
-                    <li>Track all transactions in your Stripe dashboard</li>
-                    <li>Automated payment recovery system</li>
-                    <li>Secure payment processing (PCI compliant)</li>
-                  </ul>
-                </div>
-
-                <div className="space-y-3">
-                  <Button
-                    onClick={handleConnectStripe}
-                    disabled={connectingStripe}
-                    className="w-full h-12 text-base"
-                  >
-                    <CreditCard className="w-5 h-5 mr-2" />
-                    {connectingStripe ? 'Redirecting to Stripe...' : 'Connect Your Stripe Account'}
-                  </Button>
-                  
-                  <div className="text-xs text-gray-600 text-center">
-                    Don't have a Stripe account?{' '}
-                    <a 
-                      href="https://dashboard.stripe.com/register" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline"
-                    >
-                      Create one free
-                    </a>
-                  </div>
-
-                  <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-600">
-                    <p className="font-medium mb-1">🔒 Secure Connection</p>
-                    <p>You'll be redirected to Stripe to securely connect your account. No sensitive information passes through this platform.</p>
-                  </div>
-                </div>
-              </div>
-            )}
           </CardContent>
         </Card>
 

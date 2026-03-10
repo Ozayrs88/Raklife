@@ -15,7 +15,7 @@ import {
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
-      {/* Header */}
+      {/* Simple Header */}
       <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -23,14 +23,11 @@ export default function HomePage() {
               <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
                 <TrendingUp className="w-6 h-6 text-white" />
               </div>
-              <span className="text-xl font-bold">RAKlife</span>
+              <span className="text-xl font-bold">RAKlife Business</span>
             </div>
             <div className="flex items-center gap-3">
               <Link href="/login">
-                <Button variant="ghost">Login</Button>
-              </Link>
-              <Link href="/signup">
-                <Button>Get Started Free</Button>
+                <Button>Business Login</Button>
               </Link>
             </div>
           </div>
@@ -60,11 +57,6 @@ export default function HomePage() {
               <Button size="lg" className="text-lg px-8 py-6">
                 Start Free Trial
                 <ArrowRight className="w-5 h-5 ml-2" />
-              </Button>
-            </Link>
-            <Link href="#payment-recovery">
-              <Button size="lg" variant="outline" className="text-lg px-8 py-6">
-                See Payment Recovery
               </Button>
             </Link>
           </div>

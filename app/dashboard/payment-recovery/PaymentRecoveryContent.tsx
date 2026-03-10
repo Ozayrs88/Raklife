@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import DashboardLayout from '@/components/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { 
   DollarSign, 
@@ -44,6 +46,15 @@ export default function PaymentRecoveryContent({ businessId }: Props) {
   ]);
   const [autoChaseEnabled, setAutoChaseEnabled] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [testPhone, setTestPhone] = useState('');
+  const [testName, setTestName] = useState('');
+  const [testAmount, setTestAmount] = useState('1050');
+  const [sendingTest, setSendingTest] = useState(false);
+  const [manualEmail, setManualEmail] = useState('');
+  const [manualName, setManualName] = useState('');
+  const [manualPhone, setManualPhone] = useState('');
+  const [manualAmount, setManualAmount] = useState('');
+  const [addingMember, setAddingMember] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
@@ -165,16 +176,129 @@ export default function PaymentRecoveryContent({ businessId }: Props) {
     setChaseSchedule(updated);
   }
 
+  async function sendTestWhatsApp() {
+    if (!testPhone || !testName || !testAmount) {
+      alert('Please fill in all test fields');
+      return;
+    }
+
+    setSendingTest(true);
+    try {
+      const response = await fetch('/api/notifications/test-whatsapp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to_phone: testPhone,
+          customer_name: testName,
+          overdue_amount: parseFloat(testAmount),
+          days_overdue: 14,
+          payment_link: 'https://pay.stripe.com/test_demo_link',
+          business_name: 'Test Academy'
+        })
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        alert('✅ Test WhatsApp sent successfully! Check your phone.');
+      } else {
+        alert(`❌ Failed to send: ${data.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error sending test:', error);
+      alert('❌ Failed to send test WhatsApp');
+    } finally {
+      setSendingTest(false);
+    }
+  }
+
+  async function addManualMember() {
+    if (!manualEmail || !manualName || !manualPhone || !manualAmount) {
+      alert('Please fill in all fields');
+      return;
+    }
+
+    setAddingMember(true);
+    try {
+      // Check if user exists
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('id')
+        .eq('email', manualEmail)
+        .single();
+
+      let userId: string;
+
+      if (existingUser) {
+        // Update existing user
+        userId = existingUser.id;
+        const { error: updateError } = await supabase
+          .from('users')
+          .update({
+            full_name: manualName,
+            phone: manualPhone,
+            overdue_amount: parseFloat(manualAmount),
+            payment_status: 'overdue',
+          })
+          .eq('id', userId);
+
+        if (updateError) throw updateError;
+      } else {
+        // Generate a UUID for the new user
+        const newUserId = crypto.randomUUID();
+        
+        // Create new user
+        const { data: newUser, error: insertError } = await supabase
+          .from('users')
+          .insert({
+            id: newUserId,
+            email: manualEmail,
+            full_name: manualName,
+            phone: manualPhone,
+            user_type: 'customer',
+            overdue_amount: parseFloat(manualAmount),
+            payment_status: 'overdue',
+          })
+          .select()
+          .single();
+
+        if (insertError) throw insertError;
+        if (!newUser) throw new Error('Failed to create user');
+        userId = newUser.id;
+      }
+
+      // Show success and navigate
+      if (confirm('✅ Member added successfully!\n\nGo to Members page to see them and send payment link?')) {
+        window.location.href = '/dashboard/members';
+      } else {
+        // Clear form and refresh metrics
+        setManualEmail('');
+        setManualName('');
+        setManualPhone('');
+        setManualAmount('');
+        fetchMetrics();
+      }
+    } catch (error: any) {
+      console.error('Error adding member:', error);
+      alert(`❌ Failed to add member: ${error.message || 'Unknown error'}\n\nCheck browser console for details.`);
+    } finally {
+      setAddingMember(false);
+    }
+  }
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-lg">Loading payment recovery dashboard...</div>
-      </div>
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-lg">Loading payment recovery dashboard...</div>
+        </div>
+      </DashboardLayout>
     );
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <DashboardLayout>
+      <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -376,6 +500,161 @@ export default function PaymentRecoveryContent({ businessId }: Props) {
           </Button>
         </div>
       </Card>
-    </div>
+
+      {/* Manual Member Entry */}
+      <Card className="p-6 border-2 border-green-200 bg-green-50/50">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="p-2 bg-green-600 rounded-lg">
+            <TrendingUp className="w-5 h-5 text-white" />
+          </div>
+          <h2 className="text-xl font-bold">Quick Add: Overdue Member</h2>
+        </div>
+        
+        <div className="bg-white rounded-lg p-4 space-y-4">
+          <p className="text-sm text-gray-600 mb-4">
+            Quickly add a test member with overdue amount. Perfect for testing the payment recovery flow.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Email *</label>
+              <Input
+                placeholder="member@example.com"
+                type="email"
+                value={manualEmail}
+                onChange={(e) => setManualEmail(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Full Name *</label>
+              <Input
+                placeholder="Ahmed Ali"
+                value={manualName}
+                onChange={(e) => setManualName(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Phone Number *</label>
+              <Input
+                placeholder="+971501234567"
+                value={manualPhone}
+                onChange={(e) => setManualPhone(e.target.value)}
+              />
+              <p className="text-xs text-gray-500">Include country code</p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Overdue Amount (AED) *</label>
+              <Input
+                type="number"
+                placeholder="1050"
+                value={manualAmount}
+                onChange={(e) => setManualAmount(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <Button
+              onClick={addManualMember}
+              disabled={addingMember || !manualEmail || !manualName || !manualPhone || !manualAmount}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {addingMember ? 'Adding...' : '✅ Add Overdue Member'}
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={() => window.location.href = '/dashboard/members'}
+            >
+              View Members →
+            </Button>
+          </div>
+
+          <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm">
+            <p className="font-semibold text-yellow-900 mb-1">💡 Quick Test:</p>
+            <p className="text-yellow-800">Use YOUR phone number here, then go to Members page and send payment link to test the full flow!</p>
+          </div>
+        </div>
+      </Card>
+
+      {/* Test WhatsApp */}
+      <Card className="p-6 border-2 border-purple-200 bg-purple-50/50">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="p-2 bg-purple-600 rounded-lg">
+            <Settings className="w-5 h-5 text-white" />
+          </div>
+          <h2 className="text-xl font-bold">Test WhatsApp Notification</h2>
+        </div>
+        
+        <div className="bg-white rounded-lg p-4 space-y-4">
+          <p className="text-sm text-gray-600 mb-4">
+            Send a test WhatsApp message to verify your Twilio integration is working.
+            Make sure you've joined the Twilio sandbox first!
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Your Phone Number</label>
+              <Input
+                placeholder="+447553674597"
+                value={testPhone}
+                onChange={(e) => setTestPhone(e.target.value)}
+              />
+              <p className="text-xs text-gray-500">Include country code (+44, +971, etc.)</p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Customer Name</label>
+              <Input
+                placeholder="Your Name"
+                value={testName}
+                onChange={(e) => setTestName(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Overdue Amount (AED)</label>
+              <Input
+                type="number"
+                placeholder="1050"
+                value={testAmount}
+                onChange={(e) => setTestAmount(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <Button
+              onClick={sendTestWhatsApp}
+              disabled={sendingTest || !testPhone || !testName || !testAmount}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              {sendingTest ? 'Sending...' : '📱 Send Test WhatsApp'}
+            </Button>
+            
+            <Button
+              variant="outline"
+              onClick={() => window.open('https://console.twilio.com/us1/develop/sms/try-it-out/whatsapp-learn', '_blank')}
+            >
+              Join Twilio Sandbox
+            </Button>
+          </div>
+
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+            <p className="font-semibold text-blue-900 mb-1">⚠️ Before testing:</p>
+            <ol className="list-decimal ml-4 space-y-1 text-blue-800">
+              <li>Join Twilio WhatsApp sandbox (click button above)</li>
+              <li>Send "join &lt;code&gt;" to +1 415 523 8886</li>
+              <li>Wait for confirmation</li>
+              <li>Then test here!</li>
+            </ol>
+          </div>
+        </div>
+      </Card>
+      </div>
+    </DashboardLayout>
   );
 }
