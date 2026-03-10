@@ -45,9 +45,9 @@ export default function CategoryPage() {
             url,
             type
           )
-        `)
+        `        )
         .eq('business_type', category)
-        .order('google_rating', { ascending: false, nullsLast: true });
+        .order('google_rating', { ascending: false });
 
       if (!error && data) {
         setBusinesses(data);
