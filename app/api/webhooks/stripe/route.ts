@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     // We'll need to get the correct Stripe instance for the business
     // For now, we'll use environment variable as fallback
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-      apiVersion: '2024-11-20.acacia',
+      apiVersion: '2026-02-25.clover',
     });
 
     let event: Stripe.Event;
