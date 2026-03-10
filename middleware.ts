@@ -7,6 +7,12 @@ export async function middleware(request: NextRequest) {
     return
   }
   
+  // Skip auth for public payment pages
+  if (request.nextUrl.pathname === '/payment-success' || 
+      request.nextUrl.pathname === '/payment-cancelled') {
+    return
+  }
+  
   return await updateSession(request)
 }
 
