@@ -101,10 +101,8 @@ export async function POST(request: NextRequest) {
             .eq('id', customer.id);
         }
 
-        // Create Stripe Checkout Session (instead of Payment Link for better webhook support)
-        const checkoutSession = await stripe.checkout.sessions.create({
-          mode: 'payment',
-          customer: stripeCustomerId,
+        // Create Stripe Payment Link
+        const paymentLink = await stripe.paymentLinks.create({
           line_items: [{
             price_data: {
               currency: 'aed',
@@ -112,27 +110,24 @@ export async function POST(request: NextRequest) {
                 name: `Overdue Payment - ${business.name}`,
                 description: `Outstanding balance payment`,
               },
-              unit_amount: Math.round(customer.overdue_amount * 100), // Convert to fils
+              unit_amount: Math.round(customer.overdue_amount * 100),
             },
             quantity: 1,
           }],
-          success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-          cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'}/payment-cancelled`,
           metadata: {
             customer_id: customer.id,
             business_id: business_id,
             purpose: 'overdue_recovery',
           },
-          payment_intent_data: {
-            metadata: {
-              customer_id: customer.id,
-              business_id: business_id,
-              purpose: 'overdue_recovery',
+          after_completion: {
+            type: 'hosted_confirmation',
+            hosted_confirmation: {
+              custom_message: 'Thank you for your payment! Your account has been updated.',
             },
           },
         });
 
-        const paymentUrl = checkoutSession.url;
+        const paymentUrl = paymentLink.url;
 
         // Save payment link to database
         const { data: paymentLinkRecord } = await supabase
@@ -140,7 +135,7 @@ export async function POST(request: NextRequest) {
           .insert({
             business_id: business_id,
             customer_id: customer.id,
-            stripe_payment_link_id: checkoutSession.id,
+            stripe_payment_link_id: paymentLink.id,
             stripe_payment_link_url: paymentUrl || '',
             amount: customer.overdue_amount,
             currency: 'AED',
