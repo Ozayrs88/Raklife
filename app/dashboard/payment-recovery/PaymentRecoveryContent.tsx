@@ -213,31 +213,36 @@ export default function PaymentRecoveryContent({ businessId }: Props) {
   }
 
   async function addManualMember() {
-    if (!manualEmail || !manualName || !manualPhone || !manualAmount) {
-      alert('Please fill in all fields');
+    if (!manualPhone || !manualName || !manualAmount) {
+      alert('Please fill in phone number, name, and amount');
       return;
     }
 
     setAddingMember(true);
     try {
-      // Check if user exists
+      // Check if user exists by PHONE NUMBER (WhatsApp is the key)
       const { data: existingUser } = await supabase
         .from('users')
-        .select('id')
-        .eq('email', manualEmail)
+        .select('id, overdue_amount')
+        .eq('phone', manualPhone)
         .single();
 
       let userId: string;
+      let newOverdue: number;
 
       if (existingUser) {
-        // Update existing user
+        // Update existing user - ADD to their overdue amount
         userId = existingUser.id;
+        
+        const currentOverdue = Number(existingUser.overdue_amount || 0);
+        newOverdue = currentOverdue + parseFloat(manualAmount);
+        
         const { error: updateError } = await supabase
           .from('users')
           .update({
             full_name: manualName,
-            phone: manualPhone,
-            overdue_amount: parseFloat(manualAmount),
+            email: manualEmail,
+            overdue_amount: newOverdue,
             payment_status: 'overdue',
           })
           .eq('id', userId);
@@ -268,7 +273,11 @@ export default function PaymentRecoveryContent({ businessId }: Props) {
       }
 
       // Show success and navigate
-      if (confirm('✅ Member added successfully!\n\nGo to Members page to see them and send payment link?')) {
+      const message = existingUser 
+        ? `✅ Updated existing customer!\n\nPhone: ${manualPhone}\nAdded: AED ${manualAmount}\nNew total overdue: AED ${newOverdue.toFixed(2)}\n\nGo to Members page to send payment link via WhatsApp?`
+        : '✅ New member added successfully!\n\nGo to Members page to see them and send payment link?';
+      
+      if (confirm(message)) {
         window.location.href = '/dashboard/members';
       } else {
         // Clear form and refresh metrics
@@ -512,18 +521,19 @@ export default function PaymentRecoveryContent({ businessId }: Props) {
         
         <div className="bg-white rounded-lg p-4 space-y-4">
           <p className="text-sm text-gray-600 mb-4">
-            Quickly add a test member with overdue amount. Perfect for testing the payment recovery flow.
+            Quickly add a test member with overdue amount. Perfect for testing the payment recovery flow. 
+            <strong className="text-green-700"> Phone number identifies the customer</strong> - same phone = same customer (amounts will be added together).
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Email *</label>
+              <label className="text-sm font-medium">Phone Number * 📱 (Unique ID)</label>
               <Input
-                placeholder="member@example.com"
-                type="email"
-                value={manualEmail}
-                onChange={(e) => setManualEmail(e.target.value)}
+                placeholder="+971501234567"
+                value={manualPhone}
+                onChange={(e) => setManualPhone(e.target.value)}
               />
+              <p className="text-xs text-gray-500">Include country code - this identifies the customer</p>
             </div>
 
             <div className="space-y-2">
@@ -536,13 +546,14 @@ export default function PaymentRecoveryContent({ businessId }: Props) {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Phone Number *</label>
+              <label className="text-sm font-medium">Email</label>
               <Input
-                placeholder="+971501234567"
-                value={manualPhone}
-                onChange={(e) => setManualPhone(e.target.value)}
+                placeholder="member@example.com"
+                type="email"
+                value={manualEmail}
+                onChange={(e) => setManualEmail(e.target.value)}
               />
-              <p className="text-xs text-gray-500">Include country code</p>
+              <p className="text-xs text-gray-500">Optional - mainly for records</p>
             </div>
 
             <div className="space-y-2">
@@ -559,7 +570,7 @@ export default function PaymentRecoveryContent({ businessId }: Props) {
           <div className="flex gap-3">
             <Button
               onClick={addManualMember}
-              disabled={addingMember || !manualEmail || !manualName || !manualPhone || !manualAmount}
+              disabled={addingMember || !manualPhone || !manualName || !manualAmount}
               className="bg-green-600 hover:bg-green-700"
             >
               {addingMember ? 'Adding...' : '✅ Add Overdue Member'}

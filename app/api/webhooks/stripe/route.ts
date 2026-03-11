@@ -90,6 +90,22 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     return;
   }
 
+  // Get customer details for thank you notification
+  const { data: customer } = await supabase
+    .from('users')
+    .select('full_name, email, phone, overdue_amount')
+    .eq('id', customerId)
+    .single();
+
+  // Get business details
+  const { data: business } = await supabase
+    .from('businesses')
+    .select('name, phone, email')
+    .eq('id', businessId)
+    .single();
+
+  const amountPaid = session.amount_total ? (session.amount_total / 100) : 0;
+
   // Update user payment status
   const { error: updateError } = await supabase
     .from('users')
@@ -123,6 +139,16 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   }
 
   console.log(`✅ Payment processed for customer ${customerId}`);
+
+  // Send thank you notifications (WhatsApp + Email)
+  await sendPaymentConfirmation({
+    customer,
+    business,
+    amountPaid,
+    businessId,
+    customerId,
+    supabase,
+  });
 }
 
 async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
@@ -150,6 +176,22 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
     return;
   }
 
+  // Get customer details for thank you notification
+  const { data: customer } = await supabase
+    .from('users')
+    .select('full_name, email, phone')
+    .eq('id', customerId)
+    .single();
+
+  // Get business details
+  const { data: business } = await supabase
+    .from('businesses')
+    .select('name, phone')
+    .eq('id', businessId)
+    .single();
+
+  const amountPaid = paymentIntent.amount ? (paymentIntent.amount / 100) : 0;
+
   // Update user payment status
   const { error: updateError } = await supabase
     .from('users')
@@ -166,4 +208,76 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
   }
 
   console.log(`✅ Payment confirmed for customer ${customerId}`);
+
+  // Send thank you notification via WhatsApp
+  await sendPaymentConfirmation({
+    customer,
+    business,
+    amountPaid,
+    businessId,
+    customerId,
+    supabase,
+  });
+}
+
+async function sendPaymentConfirmation(data: {
+  customer: any;
+  business: any;
+  amountPaid: number;
+  businessId: string;
+  customerId: string;
+  supabase: any;
+}) {
+  const { customer, business, amountPaid, businessId, customerId, supabase } = data;
+
+  if (!customer || !customer.phone) {
+    console.log('⚠️ No phone number found for customer, skipping WhatsApp confirmation');
+    return;
+  }
+
+  try {
+    // Import WhatsApp client
+    const { sendWhatsAppMessage } = await import('@/lib/whatsapp/client');
+
+    // Create thank you message
+    const customerName = customer.full_name?.split(' ')[0] || 'there';
+    const businessName = business?.name || 'Your Academy';
+    const businessPhone = business?.phone || '';
+
+    const thankYouMessage = `✅ Payment Received!
+
+Hi ${customerName},
+
+Thank you for your payment of *AED ${amountPaid.toFixed(2)}*! 
+
+Your account is now up to date. We appreciate your prompt payment.
+
+If you have any questions, feel free to contact us at ${businessPhone}.
+
+${businessName}
+🙏 Thank you!`;
+
+    // Send WhatsApp message
+    await sendWhatsAppMessage(businessId, customer.phone, thankYouMessage);
+
+    console.log(`✅ Thank you WhatsApp sent to ${customer.phone}`);
+
+    // Log activity
+    await supabase
+      .from('payment_activity_log')
+      .insert({
+        business_id: businessId,
+        customer_id: customerId,
+        action: 'payment_confirmation_sent',
+        details: {
+          amount_paid: amountPaid,
+          sent_via: 'whatsapp',
+          phone: customer.phone,
+        },
+      });
+
+  } catch (error) {
+    console.error('❌ Failed to send payment confirmation WhatsApp:', error);
+    // Don't throw error - we don't want to fail the webhook if notification fails
+  }
 }

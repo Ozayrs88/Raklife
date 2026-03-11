@@ -97,6 +97,27 @@ export async function POST(request: NextRequest) {
               last_payment_date: rowData.last_payment_date || null,
             })
             .eq('id', userId);
+          
+          // Check if booking exists for this business
+          const { data: existingBooking } = await supabase
+            .from('bookings')
+            .select('id')
+            .eq('customer_id', userId)
+            .eq('business_id', businessId)
+            .single();
+          
+          // Create booking if it doesn't exist
+          if (!existingBooking) {
+            await supabase
+              .from('bookings')
+              .insert({
+                business_id: businessId,
+                customer_id: userId,
+                booking_date: new Date().toISOString(),
+                status: 'active',
+                notes: 'Imported from CSV',
+              });
+          }
         } else {
           // Create new user
           const { data: newUser, error: userError } = await supabase
@@ -117,6 +138,17 @@ export async function POST(request: NextRequest) {
             throw new Error('Failed to create user');
           }
           userId = newUser.id;
+          
+          // Create booking for new user
+          await supabase
+            .from('bookings')
+            .insert({
+              business_id: businessId,
+              customer_id: userId,
+              booking_date: new Date().toISOString(),
+              status: 'active',
+              notes: 'Imported from CSV',
+            });
         }
 
         // Create or update child if provided
