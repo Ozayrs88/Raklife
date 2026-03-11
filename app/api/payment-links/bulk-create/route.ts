@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import twilio from 'twilio';
+import { sendWhatsAppMessage } from '@/lib/whatsapp/client';
 
 export async function POST(request: NextRequest) {
   try {
@@ -79,8 +79,11 @@ export async function POST(request: NextRequest) {
         let stripeCustomerId = customer.stripe_customer_id;
         
         if (!stripeCustomerId) {
+          // Validate email before sending to Stripe
+          const isValidEmail = customer.email && customer.email.includes('@') && customer.email.includes('.');
+          
           const stripeCustomer = await stripe.customers.create({
-            email: customer.email,
+            email: isValidEmail ? customer.email : undefined, // Skip invalid emails
             name: customer.full_name,
             phone: customer.phone,
             metadata: {
@@ -156,11 +159,6 @@ export async function POST(request: NextRequest) {
           try {
             console.log(`📱 Attempting WhatsApp to ${customer.phone}...`);
             
-            const twilioClient = twilio(
-              process.env.TWILIO_ACCOUNT_SID,
-              process.env.TWILIO_AUTH_TOKEN
-            );
-            
             // Calculate days overdue
             const daysOverdue = 7;
             
@@ -181,14 +179,10 @@ Questions? Contact us.
 Thank you!
 ${business.name}`;
             
-            // Send WhatsApp via Twilio
-            const whatsappResult = await twilioClient.messages.create({
-              from: process.env.TWILIO_WHATSAPP_NUMBER || 'whatsapp:+14155238886',
-              to: `whatsapp:${customer.phone}`,
-              body: message,
-            });
+            // Send WhatsApp via WhatsApp Web.js
+            await sendWhatsAppMessage(business_id, customer.phone, message);
             
-            console.log(`✅ WhatsApp sent to ${customer.phone}! SID: ${whatsappResult.sid}`);
+            console.log(`✅ WhatsApp sent to ${customer.phone}!`);
           } catch (whatsappError: any) {
             console.error(`❌ Failed to send WhatsApp to ${customer.phone}:`, whatsappError.message);
             // Don't fail the whole process if WhatsApp fails

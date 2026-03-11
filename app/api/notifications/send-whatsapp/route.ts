@@ -1,11 +1,6 @@
-import twilio from 'twilio';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-
-const client = twilio(
-  process.env.TWILIO_ACCOUNT_SID,
-  process.env.TWILIO_AUTH_TOKEN
-);
+import { sendWhatsAppMessage } from '@/lib/whatsapp/client';
 
 export async function POST(request: NextRequest) {
   try {
@@ -36,24 +31,17 @@ export async function POST(request: NextRequest) {
       .eq('id', business_id)
       .single();
 
-    // Shorten URL for WhatsApp (optional - use a URL shortener)
-    const shortLink = payment_link_url; // TODO: Use bit.ly or similar if needed
-
     // Select WhatsApp template based on days overdue
     const message = getWhatsAppMessage(days_overdue, {
       customer_name: customer.full_name?.split(' ')[0] || 'there',
       overdue_amount,
-      payment_link: shortLink,
+      payment_link: payment_link_url,
       business_name: business?.name || 'Your Academy',
       business_phone: business?.phone,
     });
 
-    // Send WhatsApp message via Twilio
-    const twilioMessage = await client.messages.create({
-      from: process.env.TWILIO_WHATSAPP_NUMBER || 'whatsapp:+14155238886',
-      to: `whatsapp:${customer.phone}`,
-      body: message,
-    });
+    // Send WhatsApp message via WhatsApp Web.js
+    await sendWhatsAppMessage(business_id, customer.phone, message);
 
     // Log activity
     await supabase
@@ -64,16 +52,15 @@ export async function POST(request: NextRequest) {
         action: 'whatsapp_sent',
         details: {
           days_overdue,
-          message_sid: twilioMessage.sid,
-          status: twilioMessage.status,
+          overdue_amount,
+          sent_via: 'whatsapp_web_js',
         },
         actor_type: 'system',
       });
 
     return NextResponse.json({ 
-      success: true, 
-      message_sid: twilioMessage.sid,
-      status: twilioMessage.status 
+      success: true,
+      message: 'WhatsApp message sent successfully'
     });
 
   } catch (error: any) {

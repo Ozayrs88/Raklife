@@ -21,7 +21,8 @@ import {
   Home,
   Building2,
   TrendingUp,
-  UserPlus
+  UserPlus,
+  MessageCircle
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -51,6 +52,12 @@ const navGroups = [
     ]
   },
   {
+    label: 'Testing',
+    items: [
+      { href: '/dashboard/whatsapp-test', label: 'WhatsApp Test', icon: MessageCircle },
+    ]
+  },
+  {
     label: 'Settings',
     items: [
       { href: '/dashboard/settings', label: 'Settings', icon: Settings },
@@ -64,7 +71,7 @@ export default function DashboardLayout({ children, businessName }: DashboardLay
   const supabase = createClient()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const [expandedGroups, setExpandedGroups] = useState<string[]>(['Overview', 'Members', 'Payments', 'Settings'])
+  const [expandedGroups, setExpandedGroups] = useState<string[]>(['Overview', 'Members', 'Payments', 'Testing', 'Settings'])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()

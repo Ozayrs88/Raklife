@@ -66,7 +66,7 @@ export async function GET() {
           // Check if we should send a chase based on schedule
           const chaseSchedule = business.payment_chase_schedule as Array<{
             days_overdue: number;
-            action: 'email' | 'sms' | 'both';
+            action: 'whatsapp';
           }>;
 
           const matchingSchedule = chaseSchedule.find(
@@ -106,41 +106,25 @@ export async function GET() {
               continue;
             }
 
-            // Send chase notification
-            if (matchingSchedule.action === 'email' || matchingSchedule.action === 'both') {
-              try {
-                await fetch('/api/notifications/send-email', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    customer_id: customer.id,
-                    business_id: business.id,
-                    payment_link_url: paymentLinkUrl,
-                    overdue_amount: customer.overdue_amount,
-                    days_overdue: daysOverdue,
-                  }),
-                });
-              } catch (error) {
-                console.error('Email send error:', error);
-              }
-            }
-
-            if (matchingSchedule.action === 'sms' || matchingSchedule.action === 'both') {
-              try {
-                await fetch('/api/notifications/send-whatsapp', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    customer_id: customer.id,
-                    business_id: business.id,
-                    payment_link_url: paymentLinkUrl,
-                    overdue_amount: customer.overdue_amount,
-                    days_overdue: daysOverdue,
-                  }),
-                });
-              } catch (error) {
-                console.error('WhatsApp send error:', error);
-              }
+            // Send WhatsApp chase notification
+            try {
+              await fetch('/api/notifications/send-whatsapp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  customer_id: customer.id,
+                  business_id: business.id,
+                  payment_link_url: paymentLinkUrl,
+                  overdue_amount: customer.overdue_amount,
+                  days_overdue: daysOverdue,
+                }),
+              });
+            } catch (error) {
+              console.error('WhatsApp send error:', error);
+              results.errors.push({
+                business_id: business.id,
+                error: `Failed to send WhatsApp to ${customer.full_name}`,
+              });
             }
 
             // Log activity

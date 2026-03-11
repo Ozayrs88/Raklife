@@ -5,9 +5,8 @@ const nextConfig: NextConfig = {
     // Temporarily ignore build errors for demo
     ignoreBuildErrors: true,
   },
-  eslint: {
-    // Temporarily ignore eslint errors for demo
-    ignoreDuringBuilds: true,
+  turbopack: {
+    root: '/Users/ozayrsoge/ZEA RAKlife',
   },
 };
 

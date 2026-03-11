@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { 
       business_id, 
-      chase_schedule, // Array of { days_overdue: number, action: 'email' | 'sms' | 'both' }
+      chase_schedule, // Array of { days_overdue: number, action: 'whatsapp' }
       auto_chase_enabled 
     } = body;
 
