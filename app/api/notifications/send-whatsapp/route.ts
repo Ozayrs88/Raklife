@@ -82,7 +82,7 @@ Friendly reminder from ${business_name}:
 
 Your account has an outstanding balance of *AED ${overdue_amount}*.
 
-Pay securely here:
+👉 Pay securely here:
 ${payment_link}
 
 Questions? Reply to this message or call ${business_phone}.
@@ -95,7 +95,7 @@ Your account balance is now *${days_overdue} days overdue*.
 
 ⚠️ Amount Due: *AED ${overdue_amount}*
 
-Please pay today:
+👉 Please pay today:
 ${payment_link}
 
 Need help? Contact us: ${business_phone}
@@ -108,7 +108,7 @@ Your account is *${days_overdue} days overdue*.
 
 Amount: *AED ${overdue_amount}*
 
-PAY NOW to avoid service interruption:
+👉 PAY NOW to avoid service interruption:
 ${payment_link}
 
 Need payment plan? Call ${business_phone} IMMEDIATELY.

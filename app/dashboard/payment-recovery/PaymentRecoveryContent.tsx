@@ -188,6 +188,7 @@ export default function PaymentRecoveryContent({ businessId }: Props) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          business_id: businessId,
           to_phone: testPhone,
           customer_name: testName,
           overdue_amount: parseFloat(testAmount),
@@ -221,11 +222,12 @@ export default function PaymentRecoveryContent({ businessId }: Props) {
     setAddingMember(true);
     try {
       // Check if user exists by PHONE NUMBER (WhatsApp is the key)
-      const { data: existingUser } = await supabase
+      const { data: existingUsers } = await supabase
         .from('users')
         .select('id, overdue_amount')
-        .eq('phone', manualPhone)
-        .single();
+        .eq('phone', manualPhone);
+
+      const existingUser = existingUsers && existingUsers.length > 0 ? existingUsers[0] : null;
 
       let userId: string;
       let newOverdue: number;
@@ -307,32 +309,33 @@ export default function PaymentRecoveryContent({ businessId }: Props) {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Payment Recovery</h1>
-          <p className="text-gray-600 mt-1">
-            Automated system to chase overdue payments
+          <h1 className="text-2xl font-bold">Payment Recovery</h1>
+          <p className="text-sm text-gray-600 mt-0.5">
+            Automated WhatsApp payment reminders
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-white rounded-lg border px-4 py-2">
-            <span className="text-sm font-medium">Auto Chase:</span>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 bg-white rounded border px-3 py-1.5">
+            <span className="text-xs font-medium">Auto Chase:</span>
             <Button
               size="sm"
               variant={autoChaseEnabled ? 'default' : 'outline'}
               onClick={() => setAutoChaseEnabled(!autoChaseEnabled)}
+              className="h-7 text-xs"
             >
               {autoChaseEnabled ? (
                 <>
-                  <Pause className="w-4 h-4 mr-1" />
-                  Enabled
+                  <Pause className="w-3 h-3 mr-1" />
+                  On
                 </>
               ) : (
                 <>
-                  <Play className="w-4 h-4 mr-1" />
-                  Disabled
+                  <Play className="w-3 h-3 mr-1" />
+                  Off
                 </>
               )}
             </Button>
@@ -341,120 +344,111 @@ export default function PaymentRecoveryContent({ businessId }: Props) {
       </div>
 
       {/* Metrics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-red-100 rounded-lg">
-              <DollarSign className="w-6 h-6 text-red-600" />
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+        <Card className="p-3">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-red-100 rounded">
+              <DollarSign className="w-4 h-4 text-red-600" />
             </div>
             <div>
-              <div className="text-sm text-gray-600">Total Overdue</div>
-              <div className="text-2xl font-bold text-red-600">
+              <div className="text-xs text-gray-600">Total Overdue</div>
+              <div className="text-lg font-bold text-red-600">
                 AED {metrics?.total_overdue.toLocaleString()}
               </div>
             </div>
           </div>
         </Card>
 
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-orange-100 rounded-lg">
-              <AlertCircle className="w-6 h-6 text-orange-600" />
+        <Card className="p-3">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-orange-100 rounded">
+              <AlertCircle className="w-4 h-4 text-orange-600" />
             </div>
             <div>
-              <div className="text-sm text-gray-600">Overdue Customers</div>
-              <div className="text-2xl font-bold">{metrics?.overdue_customers}</div>
+              <div className="text-xs text-gray-600">Overdue Customers</div>
+              <div className="text-lg font-bold">{metrics?.overdue_customers}</div>
             </div>
           </div>
         </Card>
 
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <Clock className="w-6 h-6 text-blue-600" />
+        <Card className="p-3">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-blue-100 rounded">
+              <Clock className="w-4 h-4 text-blue-600" />
             </div>
             <div>
-              <div className="text-sm text-gray-600">Links Sent</div>
-              <div className="text-2xl font-bold">{metrics?.links_sent}</div>
+              <div className="text-xs text-gray-600">Links Sent</div>
+              <div className="text-lg font-bold">{metrics?.links_sent}</div>
             </div>
           </div>
         </Card>
 
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-green-100 rounded-lg">
-              <TrendingUp className="w-6 h-6 text-green-600" />
+        <Card className="p-3">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-green-100 rounded">
+              <TrendingUp className="w-4 h-4 text-green-600" />
             </div>
             <div>
-              <div className="text-sm text-gray-600">Links Paid</div>
-              <div className="text-2xl font-bold text-green-600">{metrics?.links_paid}</div>
+              <div className="text-xs text-gray-600">Links Paid</div>
+              <div className="text-lg font-bold text-green-600">{metrics?.links_paid}</div>
             </div>
           </div>
         </Card>
 
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-purple-100 rounded-lg">
-              <TrendingUp className="w-6 h-6 text-purple-600" />
+        <Card className="p-3">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-purple-100 rounded">
+              <TrendingUp className="w-4 h-4 text-purple-600" />
             </div>
             <div>
-              <div className="text-sm text-gray-600">Recovery Rate</div>
-              <div className="text-2xl font-bold">{metrics?.recovery_rate.toFixed(1)}%</div>
+              <div className="text-xs text-gray-600">Recovery Rate</div>
+              <div className="text-lg font-bold">{metrics?.recovery_rate.toFixed(1)}%</div>
             </div>
           </div>
         </Card>
       </div>
 
       {/* Chase Schedule Configuration */}
-      <Card className="p-6">
-        <div className="flex items-center justify-between mb-6">
+      <Card className="p-4">
+        <div className="flex items-center justify-between mb-3">
           <div>
-            <h2 className="text-xl font-bold flex items-center gap-2">
-              <Settings className="w-5 h-5" />
-              Automated Chase Schedule
+            <h2 className="text-lg font-bold flex items-center gap-2">
+              <Settings className="w-4 h-4" />
+              Auto Chase Schedule
             </h2>
-            <p className="text-sm text-gray-600 mt-1">
-              Configure when to automatically send payment reminders based on days overdue
+            <p className="text-xs text-gray-600 mt-0.5">
+              Automatic WhatsApp reminders based on days overdue
             </p>
           </div>
-          <Button onClick={saveChaseSchedule} disabled={saving}>
-            <Save className="w-4 h-4 mr-2" />
-            {saving ? 'Saving...' : 'Save Schedule'}
+          <Button onClick={saveChaseSchedule} disabled={saving} size="sm">
+            <Save className="w-3.5 h-3.5 mr-1.5" />
+            {saving ? 'Saving...' : 'Save'}
           </Button>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-2">
           {chaseSchedule.map((item, index) => (
-            <div key={index} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
-              <div className="flex-1 grid grid-cols-3 gap-4">
+            <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+              <div className="flex-1 grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-sm font-medium text-gray-700">Days Overdue</label>
+                  <label className="text-xs font-medium text-gray-700">Days Overdue</label>
                   <Input
                     type="number"
                     value={item.days_overdue}
                     onChange={(e) => updateScheduleItem(index, 'days_overdue', parseInt(e.target.value))}
-                    className="mt-1"
+                    className="mt-1 h-8 text-sm"
                     min="1"
                   />
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Action</label>
-                  <select
-                    value={item.action}
-                    onChange={(e) => updateScheduleItem(index, 'action', e.target.value)}
-                    className="mt-1 w-full h-10 px-3 rounded-md border border-gray-300"
-                  >
-                    <option value="email">Email Only</option>
-                    <option value="sms">SMS Only</option>
-                    <option value="both">Email + SMS</option>
-                  </select>
-                </div>
-                <div className="flex items-end">
+                <div className="flex items-end justify-between gap-2">
+                  <div className="flex items-center gap-2 text-xs text-gray-600">
+                    <span className="font-medium">📱 WhatsApp</span>
+                  </div>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => removeScheduleItem(index)}
-                    className="text-red-600 hover:text-red-700"
+                    className="text-red-600 hover:text-red-700 h-8 px-2 text-xs"
                   >
                     Remove
                   </Button>
@@ -463,205 +457,195 @@ export default function PaymentRecoveryContent({ businessId }: Props) {
             </div>
           ))}
 
-          <Button variant="outline" onClick={addScheduleItem} className="w-full">
-            + Add Chase Reminder
+          <Button variant="outline" onClick={addScheduleItem} className="w-full h-8 text-xs">
+            + Add Reminder
           </Button>
         </div>
 
-        <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm text-blue-900">
-            <strong>How it works:</strong> When auto chase is enabled, the system will automatically send payment 
-            reminders to customers based on the schedule above. For example, if you set "7 days overdue → Email", 
-            customers who haven't paid for 7 days will automatically receive an email with their payment link.
+        <div className="mt-3 p-2.5 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-xs text-blue-900">
+            <strong>How it works:</strong> When enabled, customers automatically receive WhatsApp reminders at the specified days overdue. Messages use your custom templates from Payment Templates page.
           </p>
         </div>
       </Card>
 
       {/* Quick Actions */}
-      <Card className="p-6">
-        <h2 className="text-xl font-bold mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <Card className="p-4">
+        <h2 className="text-lg font-bold mb-3">Quick Actions</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <Button
             onClick={() => window.location.href = '/dashboard/members?filter=overdue'}
-            className="h-auto py-4 flex-col items-start"
+            className="h-auto py-3 flex-col items-start text-left"
             variant="outline"
           >
-            <span className="font-semibold mb-1">View Overdue Members</span>
-            <span className="text-sm text-gray-600">See all customers with outstanding payments</span>
+            <span className="font-semibold text-sm mb-0.5">View Overdue Members</span>
+            <span className="text-xs text-gray-600">See outstanding payments</span>
           </Button>
           
           <Button
-            onClick={() => window.location.href = '/dashboard/members/import'}
-            className="h-auto py-4 flex-col items-start"
+            onClick={() => window.location.href = '/dashboard/payment-templates'}
+            className="h-auto py-3 flex-col items-start text-left"
             variant="outline"
           >
-            <span className="font-semibold mb-1">Import CSV</span>
-            <span className="text-sm text-gray-600">Upload member data with overdue amounts</span>
+            <span className="font-semibold text-sm mb-0.5">Edit Templates</span>
+            <span className="text-xs text-gray-600">Customize WhatsApp messages</span>
           </Button>
           
           <Button
-            onClick={() => window.location.href = '/dashboard/settings?tab=payments'}
-            className="h-auto py-4 flex-col items-start"
+            onClick={() => window.location.href = '/dashboard/settings?tab=whatsapp'}
+            className="h-auto py-3 flex-col items-start text-left"
             variant="outline"
           >
-            <span className="font-semibold mb-1">Stripe Settings</span>
-            <span className="text-sm text-gray-600">Connect your Stripe account</span>
+            <span className="font-semibold text-sm mb-0.5">WhatsApp Settings</span>
+            <span className="text-xs text-gray-600">Connect your account</span>
           </Button>
         </div>
       </Card>
 
       {/* Manual Member Entry */}
-      <Card className="p-6 border-2 border-green-200 bg-green-50/50">
-        <div className="flex items-center gap-2 mb-4">
-          <div className="p-2 bg-green-600 rounded-lg">
-            <TrendingUp className="w-5 h-5 text-white" />
+      <Card className="p-4 border-2 border-green-200 bg-green-50/50">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="p-1.5 bg-green-600 rounded">
+            <TrendingUp className="w-4 h-4 text-white" />
           </div>
-          <h2 className="text-xl font-bold">Quick Add: Overdue Member</h2>
+          <h2 className="text-lg font-bold">Quick Add: Overdue Member</h2>
         </div>
         
-        <div className="bg-white rounded-lg p-4 space-y-4">
-          <p className="text-sm text-gray-600 mb-4">
-            Quickly add a test member with overdue amount. Perfect for testing the payment recovery flow. 
-            <strong className="text-green-700"> Phone number identifies the customer</strong> - same phone = same customer (amounts will be added together).
+        <div className="bg-white rounded-lg p-3 space-y-3">
+          <p className="text-xs text-gray-600">
+            Add customer with overdue amount. <strong className="text-green-700">Phone number identifies customer</strong> - same phone = amounts add up.
           </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Phone Number * 📱 (Unique ID)</label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium">Phone Number * 📱</label>
               <Input
                 placeholder="+971501234567"
                 value={manualPhone}
                 onChange={(e) => setManualPhone(e.target.value)}
+                className="h-8 text-sm"
               />
-              <p className="text-xs text-gray-500">Include country code - this identifies the customer</p>
+              <p className="text-xs text-gray-500">This identifies the customer</p>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Full Name *</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium">Full Name *</label>
               <Input
                 placeholder="Ahmed Ali"
                 value={manualName}
                 onChange={(e) => setManualName(e.target.value)}
+                className="h-8 text-sm"
               />
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Email</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium">Email</label>
               <Input
                 placeholder="member@example.com"
                 type="email"
                 value={manualEmail}
                 onChange={(e) => setManualEmail(e.target.value)}
+                className="h-8 text-sm"
               />
-              <p className="text-xs text-gray-500">Optional - mainly for records</p>
+              <p className="text-xs text-gray-500">Optional</p>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Overdue Amount (AED) *</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium">Overdue Amount (AED) *</label>
               <Input
                 type="number"
                 placeholder="1050"
                 value={manualAmount}
                 onChange={(e) => setManualAmount(e.target.value)}
+                className="h-8 text-sm"
               />
             </div>
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex gap-2">
             <Button
               onClick={addManualMember}
               disabled={addingMember || !manualPhone || !manualName || !manualAmount}
-              className="bg-green-600 hover:bg-green-700"
+              className="bg-green-600 hover:bg-green-700 h-9 text-sm"
             >
-              {addingMember ? 'Adding...' : '✅ Add Overdue Member'}
+              {addingMember ? 'Adding...' : '✅ Add Member'}
             </Button>
 
             <Button
               variant="outline"
               onClick={() => window.location.href = '/dashboard/members'}
+              className="h-9 text-sm"
             >
               View Members →
             </Button>
           </div>
 
-          <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm">
-            <p className="font-semibold text-yellow-900 mb-1">💡 Quick Test:</p>
-            <p className="text-yellow-800">Use YOUR phone number here, then go to Members page and send payment link to test the full flow!</p>
+          <div className="p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
+            <p className="font-semibold text-yellow-900">💡 Quick Test:</p>
+            <p className="text-yellow-800">Use YOUR phone to test the full payment flow!</p>
           </div>
         </div>
       </Card>
 
       {/* Test WhatsApp */}
-      <Card className="p-6 border-2 border-purple-200 bg-purple-50/50">
-        <div className="flex items-center gap-2 mb-4">
-          <div className="p-2 bg-purple-600 rounded-lg">
-            <Settings className="w-5 h-5 text-white" />
+      <Card className="p-4 border-2 border-purple-200 bg-purple-50/50">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="p-1.5 bg-purple-600 rounded">
+            <Settings className="w-4 h-4 text-white" />
           </div>
-          <h2 className="text-xl font-bold">Test WhatsApp Notification</h2>
+          <h2 className="text-lg font-bold">Test WhatsApp</h2>
         </div>
         
-        <div className="bg-white rounded-lg p-4 space-y-4">
-          <p className="text-sm text-gray-600 mb-4">
-            Send a test WhatsApp message to verify your Twilio integration is working.
-            Make sure you've joined the Twilio sandbox first!
+        <div className="bg-white rounded-lg p-3 space-y-3">
+          <p className="text-xs text-gray-600">
+            Send a test payment reminder to verify WhatsApp is working.
           </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Your Phone Number</label>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium">Your Phone</label>
               <Input
-                placeholder="+447553674597"
+                placeholder="+971501234567"
                 value={testPhone}
                 onChange={(e) => setTestPhone(e.target.value)}
+                className="h-8 text-sm"
               />
-              <p className="text-xs text-gray-500">Include country code (+44, +971, etc.)</p>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Customer Name</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium">Name</label>
               <Input
                 placeholder="Your Name"
                 value={testName}
                 onChange={(e) => setTestName(e.target.value)}
+                className="h-8 text-sm"
               />
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Overdue Amount (AED)</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium">Amount (AED)</label>
               <Input
                 type="number"
                 placeholder="1050"
                 value={testAmount}
                 onChange={(e) => setTestAmount(e.target.value)}
+                className="h-8 text-sm"
               />
             </div>
           </div>
 
-          <div className="flex gap-3">
-            <Button
-              onClick={sendTestWhatsApp}
-              disabled={sendingTest || !testPhone || !testName || !testAmount}
-              className="bg-purple-600 hover:bg-purple-700"
-            >
-              {sendingTest ? 'Sending...' : '📱 Send Test WhatsApp'}
-            </Button>
-            
-            <Button
-              variant="outline"
-              onClick={() => window.open('https://console.twilio.com/us1/develop/sms/try-it-out/whatsapp-learn', '_blank')}
-            >
-              Join Twilio Sandbox
-            </Button>
-          </div>
+          <Button
+            onClick={sendTestWhatsApp}
+            disabled={sendingTest || !testPhone || !testName || !testAmount}
+            className="w-full bg-purple-600 hover:bg-purple-700 h-9 text-sm"
+          >
+            {sendingTest ? 'Sending...' : '📱 Send Test WhatsApp'}
+          </Button>
 
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm">
-            <p className="font-semibold text-blue-900 mb-1">⚠️ Before testing:</p>
-            <ol className="list-decimal ml-4 space-y-1 text-blue-800">
-              <li>Join Twilio WhatsApp sandbox (click button above)</li>
-              <li>Send "join &lt;code&gt;" to +1 415 523 8886</li>
-              <li>Wait for confirmation</li>
-              <li>Then test here!</li>
-            </ol>
+          <div className="p-2 bg-blue-50 border border-blue-200 rounded text-xs">
+            <p className="text-blue-800">
+              <strong>Note:</strong> Make sure WhatsApp is connected in Settings → WhatsApp before testing.
+            </p>
           </div>
         </div>
       </Card>

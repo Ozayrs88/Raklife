@@ -109,6 +109,8 @@ export async function POST(request: NextRequest) {
               product_data: {
                 name: `Overdue Payment - ${business.name}`,
                 description: `Outstanding balance payment`,
+                // Add your logo here (must be publicly accessible URL)
+                // images: ['https://your-domain.com/logo.png'],
               },
               unit_amount: Math.round(customer.overdue_amount * 100),
             },
@@ -166,7 +168,7 @@ Your account with ${business.name} is ${daysOverdue} days overdue.
 
 Amount due: *AED ${customer.overdue_amount}*
 
-Please pay now to avoid service interruption:
+👉 Pay securely now:
 ${paymentUrl}
 
 Questions? Contact us.
