@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import DashboardLayout from '@/components/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Upload, Send, Search, Filter } from 'lucide-react';
+import { Upload, Send, Search, Filter, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 type Member = {
@@ -44,23 +44,11 @@ export default function MembersContent({ businessId }: Props) {
 
   async function fetchMembers() {
     try {
-      // SIMPLIFIED: Get all customers with overdue amounts for this business
-      // We'll filter by business through bookings OR just show all overdue customers
+      console.log('🔍 Fetching members...');
       
-      // Option 1: Try to get via bookings first
-      const { data: bookings } = await supabase
-        .from('bookings')
-        .select('customer_id')
-        .eq('business_id', businessId);
-
-      let customerIds: string[] = [];
-      
-      if (bookings && bookings.length > 0) {
-        customerIds = [...new Set(bookings.map(b => b.customer_id))];
-      }
-
-      // Option 2: If no bookings, just get all customers with overdue amounts
-      let query = supabase
+      // Get ALL customer users (simplified - no business filtering)
+      // This allows manually added users to show up immediately
+      const { data: customers, error } = await supabase
         .from('users')
         .select(`
           id,
@@ -72,16 +60,19 @@ export default function MembersContent({ businessId }: Props) {
           last_payment_date,
           stripe_customer_id
         `)
-        .eq('user_type', 'customer');
+        .eq('user_type', 'customer')
+        .order('created_at', { ascending: false });
 
-      // If we have customer IDs from bookings, filter by those
-      if (customerIds.length > 0) {
-        query = query.in('id', customerIds);
+      if (error) {
+        console.error('❌ Error fetching members:', error);
+        throw error;
       }
 
-      const { data: customers } = await query;
+      console.log(`✅ Found ${customers?.length || 0} customer users:`, customers);
 
       if (!customers || customers.length === 0) {
+        console.log('No customers found');
+        setMembers([]);
         setLoading(false);
         return;
       }
@@ -102,9 +93,10 @@ export default function MembersContent({ businessId }: Props) {
         })
       );
 
+      console.log('✅ Members with children counts:', membersWithChildren);
       setMembers(membersWithChildren);
     } catch (error) {
-      console.error('Error fetching members:', error);
+      console.error('❌ Error fetching members:', error);
     } finally {
       setLoading(false);
     }
@@ -181,6 +173,44 @@ export default function MembersContent({ businessId }: Props) {
     }
   }
 
+  async function deleteSelectedMembers() {
+    if (selectedMembers.size === 0) {
+      alert('Please select at least one member to delete');
+      return;
+    }
+
+    if (!confirm(`⚠️ Delete ${selectedMembers.size} selected member(s)?\n\nThis will also delete their:\n- Payment links\n- Bookings\n- Children records\n\nThis action cannot be undone!`)) {
+      return;
+    }
+
+    try {
+      const memberIds = Array.from(selectedMembers);
+      console.log('🗑️ Deleting members:', memberIds);
+
+      const response = await fetch('/api/members/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_ids: memberIds,
+        }),
+      });
+
+      const result = await response.json();
+      console.log('Delete response:', result);
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to delete members');
+      }
+
+      alert(`✅ Successfully deleted ${result.deleted_count} member(s)!`);
+      setSelectedMembers(new Set());
+      fetchMembers();
+    } catch (error: any) {
+      console.error('❌ Error deleting members:', error);
+      alert(`❌ Failed to delete members: ${error.message}\n\nCheck browser console for details.`);
+    }
+  }
+
   const totalOverdue = filteredMembers.reduce((sum, m) => sum + m.overdue_amount, 0);
   const overdueCount = filteredMembers.filter(m => m.overdue_amount > 0).length;
 
@@ -219,6 +249,14 @@ export default function MembersContent({ businessId }: Props) {
           >
             <Send className="w-4 h-4 mr-2" />
             Send Payment Links ({selectedMembers.size})
+          </Button>
+          <Button
+            onClick={deleteSelectedMembers}
+            disabled={selectedMembers.size === 0}
+            variant="destructive"
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            Delete Selected ({selectedMembers.size})
           </Button>
         </div>
       </div>
@@ -373,7 +411,7 @@ export default function MembersContent({ businessId }: Props) {
                       size="sm"
                       onClick={() => router.push(`/dashboard/members/${member.id}`)}
                     >
-                      View
+                      Edit
                     </Button>
                   </td>
                 </tr>

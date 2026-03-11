@@ -55,6 +55,7 @@ export default function PaymentRecoveryContent({ businessId }: Props) {
   const [manualPhone, setManualPhone] = useState('');
   const [manualAmount, setManualAmount] = useState('');
   const [addingMember, setAddingMember] = useState(false);
+  const [deletingTestUsers, setDeletingTestUsers] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
@@ -221,11 +222,12 @@ export default function PaymentRecoveryContent({ businessId }: Props) {
 
     setAddingMember(true);
     try {
-      // Check if user exists by PHONE NUMBER (WhatsApp is the key)
+      // Check if CUSTOMER exists by PHONE NUMBER (not business owners!)
       const { data: existingUsers } = await supabase
         .from('users')
         .select('id, overdue_amount')
-        .eq('phone', manualPhone);
+        .eq('phone', manualPhone)
+        .eq('user_type', 'customer');  // IMPORTANT: Only look for customers!
 
       const existingUser = existingUsers && existingUsers.length > 0 ? existingUsers[0] : null;
 
@@ -254,12 +256,15 @@ export default function PaymentRecoveryContent({ businessId }: Props) {
         // Generate a UUID for the new user
         const newUserId = crypto.randomUUID();
         
+        // If email is empty, generate a unique one
+        const finalEmail = manualEmail || `customer-${newUserId}@raklife.local`;
+        
         // Create new user
         const { data: newUser, error: insertError } = await supabase
           .from('users')
           .insert({
             id: newUserId,
-            email: manualEmail,
+            email: finalEmail,
             full_name: manualName,
             phone: manualPhone,
             user_type: 'customer',
@@ -294,6 +299,93 @@ export default function PaymentRecoveryContent({ businessId }: Props) {
       alert(`❌ Failed to add member: ${error.message || 'Unknown error'}\n\nCheck browser console for details.`);
     } finally {
       setAddingMember(false);
+    }
+  }
+
+  async function deleteAllTestUsers() {
+    if (!confirm('⚠️ Delete ALL customer users?\n\nThis will show you all customer accounts so you can choose which to delete.\n\nContinue?')) {
+      return;
+    }
+
+    setDeletingTestUsers(true);
+    try {
+      // Get ALL customer users (simpler query)
+      const { data: allUsers, error: fetchError } = await supabase
+        .from('users')
+        .select('id, full_name, phone, email, overdue_amount')
+        .eq('user_type', 'customer')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (fetchError) {
+        console.error('Fetch error:', fetchError);
+        throw fetchError;
+      }
+
+      if (!allUsers || allUsers.length === 0) {
+        alert('No customer users found');
+        setDeletingTestUsers(false);
+        return;
+      }
+
+      // Show all users with better formatting
+      const userList = allUsers.map((u, i) => 
+        `${i + 1}. ${u.full_name || 'No name'} | ${u.phone || 'No phone'} | ${u.email || 'No email'} | AED ${u.overdue_amount || 0}`
+      ).join('\n');
+      
+      const selection = prompt(
+        `Found ${allUsers.length} customer user(s):\n\n${userList}\n\n` +
+        `Enter numbers to delete (comma-separated, e.g., "1,3,5") or type "all" to delete all:`
+      );
+
+      if (!selection) {
+        setDeletingTestUsers(false);
+        return;
+      }
+
+      let usersToDelete: string[] = [];
+
+      if (selection.toLowerCase().trim() === 'all') {
+        usersToDelete = allUsers.map(u => u.id);
+      } else {
+        const indices = selection.split(',').map(s => parseInt(s.trim()) - 1);
+        usersToDelete = indices
+          .filter(i => i >= 0 && i < allUsers.length)
+          .map(i => allUsers[i].id);
+      }
+
+      if (usersToDelete.length === 0) {
+        alert('No valid users selected');
+        setDeletingTestUsers(false);
+        return;
+      }
+
+      // Final confirmation
+      if (!confirm(`Delete ${usersToDelete.length} user(s)? This cannot be undone!`)) {
+        setDeletingTestUsers(false);
+        return;
+      }
+
+      // Delete selected users
+      const { error: deleteError } = await supabase
+        .from('users')
+        .delete()
+        .in('id', usersToDelete);
+
+      if (deleteError) {
+        console.error('Delete error:', deleteError);
+        throw deleteError;
+      }
+
+      alert(`✅ Successfully deleted ${usersToDelete.length} user(s)!`);
+      
+      // Redirect to Members page to see updated list
+      window.location.href = '/dashboard/members';
+    } catch (error: any) {
+      console.error('Error deleting users:', error);
+      alert(`❌ Failed to delete users: ${error.message}\n\nCheck browser console for details.\n\nNote: Users may have related records (bookings, children, etc.) preventing deletion.`);
+    } finally {
+      setDeletingTestUsers(false);
     }
   }
 
@@ -472,7 +564,7 @@ export default function PaymentRecoveryContent({ businessId }: Props) {
       {/* Quick Actions */}
       <Card className="p-4">
         <h2 className="text-lg font-bold mb-3">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <Button
             onClick={() => window.location.href = '/dashboard/members?filter=overdue'}
             className="h-auto py-3 flex-col items-start text-left"
@@ -480,6 +572,15 @@ export default function PaymentRecoveryContent({ businessId }: Props) {
           >
             <span className="font-semibold text-sm mb-0.5">View Overdue Members</span>
             <span className="text-xs text-gray-600">See outstanding payments</span>
+          </Button>
+
+          <Button
+            onClick={() => window.location.href = '/dashboard/members'}
+            className="h-auto py-3 flex-col items-start text-left"
+            variant="outline"
+          >
+            <span className="font-semibold text-sm mb-0.5">Edit Members</span>
+            <span className="text-xs text-gray-600">Update debt amounts</span>
           </Button>
           
           <Button
@@ -577,6 +678,15 @@ export default function PaymentRecoveryContent({ businessId }: Props) {
               className="h-9 text-sm"
             >
               View Members →
+            </Button>
+
+            <Button
+              variant="destructive"
+              onClick={deleteAllTestUsers}
+              disabled={deletingTestUsers}
+              className="h-9 text-sm bg-red-600 hover:bg-red-700"
+            >
+              {deletingTestUsers ? 'Deleting...' : '🗑️ Delete Test Users'}
             </Button>
           </div>
 
