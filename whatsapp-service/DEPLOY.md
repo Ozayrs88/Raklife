@@ -23,8 +23,8 @@ railway login
 railway init
 
 # Add environment variables
-railway variables set SUPABASE_URL=https://xqktkocghagcwdlljcho.supabase.co
-railway variables set SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhxa3Rrb2NnaGFnY3dkbGxqY2hvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjgxOTUwOCwiZXhwIjoyMDg4Mzk1NTA4fQ.j1-Nv3tC10Ads1gs4dAPF39QVwWhL8DaxWPHf2zPvwA
+railway variables set SUPABASE_URL=your_supabase_url_here
+railway variables set SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
 
 # Deploy
 railway up

@@ -22,14 +22,14 @@ Replace your current `user-firecrawl` or `user-user-firecrawl` configuration wit
       "command": "npx",
       "args": ["-y", "firecrawl-mcp"],
       "env": {
-        "FIRECRAWL_API_KEY": "fc-bce1e3cd8d4241659966c817b3060b8f"
+        "FIRECRAWL_API_KEY": "your_firecrawl_api_key_here"
       }
     }
   }
 }
 ```
 
-**Important:** Replace `fc-bce1e3cd8d4241659966c817b3060b8f` with your actual Firecrawl API key if it's different.
+**Important:** Replace `your_firecrawl_api_key_here` with your actual Firecrawl API key.
 
 ### Step 3: Save and Restart
 
@@ -56,7 +56,7 @@ If you have multiple MCP servers, your full configuration might look like this:
       "command": "npx",
       "args": ["-y", "firecrawl-mcp"],
       "env": {
-        "FIRECRAWL_API_KEY": "fc-bce1e3cd8d4241659966c817b3060b8f"
+        "FIRECRAWL_API_KEY": "your_firecrawl_api_key_here"
       }
     },
     "other-server": {
@@ -90,7 +90,7 @@ Then I'll:
 2. **Check Credits**: Log into Firecrawl dashboard and verify you have credits
 3. **Manual Test**: Run this in terminal:
    ```bash
-   FIRECRAWL_API_KEY=fc-your-key-here npx firecrawl-mcp
+   FIRECRAWL_API_KEY=your_firecrawl_api_key_here npx firecrawl-mcp
    ```
 4. **Check Logs**: Look for errors in Cursor's output panel
 
